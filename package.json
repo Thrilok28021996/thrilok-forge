@@ -1,0 +1,10 @@
+{
+  "name": "thrilok-forge",
+  "private": true,
+  "type": "module",
+  "description": "Thrilok Forge — static showcase site for Thrilok's projects",
+  "scripts": {
+    "check": "node --check build.mjs",
+    "build": "node build.mjs"
+  }
+}
