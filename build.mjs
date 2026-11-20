@@ -41,14 +41,19 @@ function escapeHtml(value) {
 }
 
 function parseRepoUrl(url) {
-  const u = new URL(url);
-  const host = u.hostname === 'github.com' ? 'github'
+  let u;
+  try {
+    u = new URL(url);
+  } catch {
+    return null;
+  }
+  const host = u.hostname === 'github.com' || u.hostname === 'www.github.com' ? 'github'
     : u.hostname === 'codeberg.org' ? 'codeberg'
     : null;
   if (!host) return null;
-  const [owner, repo] = u.pathname.replace(/^\//, '').replace(/\.git$/, '').split('/');
-  if (!owner || !repo) return null;
-  return { host, owner, repo };
+  const segments = u.pathname.replace(/^\//, '').replace(/\.git$/, '').split('/').filter(Boolean);
+  if (segments.length !== 2) return null;
+  return { host, owner: segments[0], repo: segments[1] };
 }
 
 async function fetchJSON(url, headers = {}) {
@@ -109,7 +114,7 @@ function renderCard(project, meta) {
     .map((tag) => `<li>${escapeHtml(tag)}</li>`)
     .join('');
   const language = meta.language
-    ? `<span class="lang"><span class="lang-dot" style="background:${LANGUAGE_COLORS[meta.language] ?? '#8b949e'}"></span>${escapeHtml(meta.language)}</span>`
+    ? `<span class="lang"><span class="lang-dot" style="background:${Object.hasOwn(LANGUAGE_COLORS, meta.language) ? LANGUAGE_COLORS[meta.language] : '#8b949e'}"></span>${escapeHtml(meta.language)}</span>`
     : '';
   return `      <li>
         <a class="card" href="${href}" target="_blank" rel="noopener noreferrer">
@@ -172,8 +177,25 @@ ${cards.join('\n')}
 async function main() {
   const raw = await readFile(path.join(root, 'projects.json'), 'utf8');
   const { site, projects } = JSON.parse(raw);
-  if (!site || !Array.isArray(projects) || projects.length === 0) {
+  if (!site || typeof site !== 'object') {
     throw new Error('projects.json must contain a site object and a non-empty projects array');
+  }
+  for (const field of ['name', 'owner', 'tagline', 'kofi']) {
+    if (typeof site[field] !== 'string' || site[field].trim() === '') {
+      throw new Error(`projects.json: site."${field}" must be a non-empty string`);
+    }
+  }
+  let kofiUrl;
+  try {
+    kofiUrl = new URL(site.kofi);
+  } catch {
+    throw new Error('projects.json: site."kofi" must be an absolute https:// URL');
+  }
+  if (kofiUrl.protocol !== 'https:') {
+    throw new Error('projects.json: site."kofi" must be an absolute https:// URL');
+  }
+  if (!Array.isArray(projects) || projects.length === 0) {
+    throw new Error('projects.json must contain a non-empty projects array');
   }
   for (const [i, p] of projects.entries()) {
     for (const field of ['url', 'title', 'description']) {
@@ -181,17 +203,22 @@ async function main() {
         throw new Error(`projects.json: projects[${i}] needs a non-empty "${field}"`);
       }
     }
-    if (p.tags !== undefined && !Array.isArray(p.tags)) {
-      throw new Error(`projects.json: projects[${i}] "tags" must be an array`);
+    if (!parseRepoUrl(p.url)) {
+      throw new Error(`projects.json: projects[${i}] "url" must be a github.com or codeberg.org repo URL (exactly https://host/owner/repo)`);
+    }
+    if (p.tags !== undefined) {
+      if (!Array.isArray(p.tags) || p.tags.some((t) => typeof t !== 'string' || t.trim() === '')) {
+        throw new Error(`projects.json: projects[${i}] "tags" must be an array of non-empty strings`);
+      }
     }
   }
 
-  const cards = [];
-  for (const project of projects) {
-    const meta = await fetchMetadata(project);
+  const metas = await Promise.all(projects.map((project) => fetchMetadata(project)));
+  const cards = projects.map((project, i) => {
+    const meta = metas[i];
     console.log(`  ${project.title}: stars=${meta.stars ?? 'fallback'} language=${meta.language ?? 'fallback'}`);
-    cards.push(renderCard(project, meta));
-  }
+    return renderCard(project, meta);
+  });
 
   await mkdir(dist, { recursive: true });
   await writeFile(path.join(dist, 'index.html'), renderPage(site, cards));
