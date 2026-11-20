@@ -1,0 +1,22 @@
+{
+  "site": {
+    "name": "Thrilok Forge",
+    "owner": "Thrilok",
+    "tagline": "Things I build — AI experiments, tools, and plugins.",
+    "kofi": "https://ko-fi.com/thriloke96"
+  },
+  "projects": [
+    {
+      "url": "https://github.com/Thrilok28021996/curio",
+      "title": "Curio",
+      "description": "AI that knows what it doesn't know — and learns it. An autonomous learning agent for LM Studio that detects knowledge gaps, seeks answers, evaluates quality, and tracks what it has learned. Ships as an MCP server.",
+      "tags": ["MCP", "AI agent", "LM Studio", "Python"]
+    },
+    {
+      "url": "https://codeberg.org/thrilok/lm-studio-plugins",
+      "title": "LM Studio Plugins",
+      "description": "Local AI extensions for privacy-first productivity — deep research with persistent memory, web search, job tracking, idea validation, image generation and more. Your data stays on your machine.",
+      "tags": ["LM Studio", "Plugins", "Local AI", "JavaScript"]
+    }
+  ]
+}
