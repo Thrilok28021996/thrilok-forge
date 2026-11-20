@@ -54,6 +54,7 @@ function parseRepoUrl(url) {
 async function fetchJSON(url, headers = {}) {
   const res = await fetch(url, {
     headers: { 'User-Agent': 'thrilok-forge-build', Accept: 'application/json', ...headers },
+    signal: AbortSignal.timeout(10_000),
   });
   if (!res.ok) throw new Error(`${url} -> HTTP ${res.status}`);
   return res.json();
@@ -61,12 +62,12 @@ async function fetchJSON(url, headers = {}) {
 
 // Fetch stars + primary language; never throws — falls back to nulls.
 async function fetchMetadata(project) {
-  const parsed = parseRepoUrl(project.url);
-  if (!parsed) {
-    console.warn(`warn: unsupported repo URL, no metadata: ${project.url}`);
-    return { stars: null, language: null };
-  }
   try {
+    const parsed = parseRepoUrl(project.url);
+    if (!parsed) {
+      console.warn(`warn: unsupported repo URL, no metadata: ${project.url}`);
+      return { stars: null, language: null };
+    }
     if (parsed.host === 'github') {
       const headers = process.env.GITHUB_TOKEN
         ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` }
@@ -104,7 +105,7 @@ function renderCard(project, meta) {
   const description = escapeHtml(project.description);
   const href = escapeHtml(project.url);
   const stars = escapeHtml(formatStars(meta.stars));
-  const tags = project.tags
+  const tags = (project.tags ?? [])
     .map((tag) => `<li>${escapeHtml(tag)}</li>`)
     .join('');
   const language = meta.language
@@ -173,6 +174,16 @@ async function main() {
   const { site, projects } = JSON.parse(raw);
   if (!site || !Array.isArray(projects) || projects.length === 0) {
     throw new Error('projects.json must contain a site object and a non-empty projects array');
+  }
+  for (const [i, p] of projects.entries()) {
+    for (const field of ['url', 'title', 'description']) {
+      if (typeof p?.[field] !== 'string' || p[field].trim() === '') {
+        throw new Error(`projects.json: projects[${i}] needs a non-empty "${field}"`);
+      }
+    }
+    if (p.tags !== undefined && !Array.isArray(p.tags)) {
+      throw new Error(`projects.json: projects[${i}] "tags" must be an array`);
+    }
   }
 
   const cards = [];

@@ -34,6 +34,8 @@ automatically.
 
 ## Run locally
 
+Requires Node 18+ (the build uses global `fetch`).
+
 ```bash
 npm run build     # writes dist/
 npm run check     # syntax-check build.mjs
