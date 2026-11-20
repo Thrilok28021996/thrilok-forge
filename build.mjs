@@ -47,12 +47,14 @@ function parseRepoUrl(url) {
   } catch {
     return null;
   }
+  if (u.protocol !== 'https:') return null;
   const host = u.hostname === 'github.com' || u.hostname === 'www.github.com' ? 'github'
     : u.hostname === 'codeberg.org' ? 'codeberg'
     : null;
   if (!host) return null;
-  const segments = u.pathname.replace(/^\//, '').replace(/\.git$/, '').split('/').filter(Boolean);
+  const segments = u.pathname.split('/').filter(Boolean);
   if (segments.length !== 2) return null;
+  if (segments[1].endsWith('.git')) segments[1] = segments[1].slice(0, -4);
   return { host, owner: segments[0], repo: segments[1] };
 }
 
@@ -69,10 +71,6 @@ async function fetchJSON(url, headers = {}) {
 async function fetchMetadata(project) {
   try {
     const parsed = parseRepoUrl(project.url);
-    if (!parsed) {
-      console.warn(`warn: unsupported repo URL, no metadata: ${project.url}`);
-      return { stars: null, language: null };
-    }
     if (parsed.host === 'github') {
       const headers = process.env.GITHUB_TOKEN
         ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` }
